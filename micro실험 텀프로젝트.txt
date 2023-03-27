@@ -1,0 +1,248 @@
+#include <avr/io.h>      // header file,
+#include <avr/interrupt.h>
+#include <util/delay.h>
+
+#define ON_OFF_VALUE 818
+#define F_CPU 16000000UL
+
+#define OVERFLOW 256
+#define TICKS_PER_SEC 1000
+#include <stdlib.h>
+
+void init_adc();
+
+unsigned short read_adc();
+
+void buzzer();
+
+void buzzer2();
+
+volatile unsigned char counter, counter2;
+
+unsigned int tick_time = 0;
+
+unsigned char score[5] = { 0x3F, 0x06, 0x5B, 0x4F, 0x66 };
+
+unsigned char number[5] = { 0xbF, 0x86, 0xdb, 0xcf, 0xe6 };
+
+volatile unsigned int num, i, j, k;
+
+int segment[2] = { 0x73, 0x06 };   //1p
+int segment2[2] = { 0x73, 0x5b };   //2p
+int a[4] = { 0x01, 0x02, 0x04, 0x08 };
+
+int ten = 0;
+
+int unit = 0;
+
+int ten2;
+
+int unit2;
+
+unsigned int e, L;
+
+unsigned int o, w;
+
+char led[8] = { 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80 };
+
+unsigned short Value;
+
+ISR(TIMER0_COMP_vect)
+{
+   tick_time++;
+   if (tick_time == TICKS_PER_SEC)
+   {
+      tick_time = 0;
+   }
+}
+
+int main()
+{
+   init_adc();
+   tick_time = 0;
+   Value = 0;
+   DDRA = 0xff;
+   DDRG = 0X0F;
+   DDRC = 0XFF;
+   PORTC = 0XFF;
+   PORTG = 0XFF;
+   EICRA = 0x00;
+   EICRB = 0x10;
+   EIMSK = 0x30;
+   OCR0 = 125;
+   TCNT0 = 0;
+   TIMSK = 0x02;
+   sei();
+   TCCR0 = 0x1D;
+   do {
+      Value = read_adc();
+      PORTA = 0xff;
+      if (Value < ON_OFF_VALUE)
+      {
+         srand(tick_time);
+         PORTA = rand() % 256;
+         _delay_ms(10000);
+      }
+      else
+      {
+         PORTA = 0x00;
+      }
+      for (i = 0; i < 70; ++i)
+      {
+         PORTG = 0x01;
+         PORTC = score[unit];
+         _delay_ms(1);
+         PORTG = 0x02;
+         PORTC = score[ten];
+         _delay_ms(1);
+      }
+      for (i = 0; i < 100; ++i)
+      {
+         PORTG = 0x04;
+         PORTC = number[unit2];
+         _delay_ms(1);
+         PORTG = 0x08;
+         PORTC = score[ten2];
+         _delay_ms(1);
+      }
+      if (counter == 5)
+      {
+         DDRB |= (1 << DDB4);
+         while (1)
+         {
+            PORTA = 0xAA;
+            for (i = 0; i < 5; i++)
+            {
+               _delay_ms(50);
+               PORTG = a[i];
+               if (i == 0)
+                  PORTC = 0x00;
+               else if (i == 1)
+                  PORTC = 0x73;
+               else if (i == 2)
+                  PORTC = 0x06;
+               else if (i == 3)
+                  PORTC = 0x00;
+            }
+         }
+         break;
+      }
+      if (counter2 == 5)
+      {
+         DDRB |= (1 << DDB4);
+         while (1) {
+            PORTA = 0x55;
+            for (i = 0; i < 5; i++)
+            {
+               _delay_ms(50);
+               PORTG = a[i];
+               if (i == 0)
+                  PORTC = 0x00;
+               else if (i == 1)
+                  PORTC = 0x73;
+               else if (i == 2)
+                  PORTC = 0x5b;
+               else if (i == 3)
+                  PORTC = 0x00;
+            }
+         }
+         break;
+      }
+   } while (1);
+   return (1);
+
+}
+
+unsigned int e, L;
+
+ISR(INT4_vect)
+{
+   int i;
+   PORTA = 0X0f;
+   _delay_ms(500);
+   PORTA = 0X00;
+   _delay_ms(500);
+   counter++;
+   _delay_ms(1250);
+   ten = 0;
+   unit = counter % 5;
+   for (i = 0; i < 1; i++)
+   {
+      buzzer();
+   }
+}
+
+ISR(INT5_vect)
+{
+   PORTA = 0Xf0;
+   _delay_ms(500);
+   PORTA = 0X00;
+   _delay_ms(500);
+   counter2++;
+   _delay_ms(1250);
+   ten2 = 0;
+   unit2 = counter2 % 5;
+   for (i = 0; i < 1; i++)
+   {
+      buzzer2();
+   }
+}
+void init_adc()
+{
+   DDRF &= 0xFE;
+   ADMUX = 0x40;
+   ADCSR = 0x87;
+}
+unsigned short read_adc()
+{
+   unsigned char adc_low, adc_high;
+   unsigned short value;
+   ADCSR |= 0x40;
+   while ((ADCSR & 0x10) != 0x10);
+   adc_low = ADCL;
+   adc_high = ADCH;
+   value = ((unsigned short)adc_high << 8) | (unsigned short)adc_low;
+   return value;
+
+}
+
+void buzzer()
+{
+   int i, ms, us;
+   ms = (int)(500 / (float)240);
+   us = ((500 / (float)240) - ms) * 1000;
+
+   for (i = 0; i < 12; i++)
+   {
+      PORTB = 0x10;
+      _delay_ms(ms);
+      _delay_ms(us);
+      PORTB = 0x00;
+      _delay_ms(ms);
+      _delay_ms(us);
+   }
+}
+
+void buzzer2()
+{
+   int i, ms, us;
+   ms = (int)(500 / (float)480);
+   us = ((500 / (float)480) - ms) * 1000;
+   for (i = 0; i < 12; i++)
+   {
+      PORTB = 0x10;
+      _delay_ms(ms);
+
+
+      _delay_ms(us);
+
+
+      PORTB = 0x00;
+
+
+      _delay_ms(ms);
+
+      _delay_ms(us);
+   }
+}
+
